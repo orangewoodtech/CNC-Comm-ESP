@@ -17,10 +17,10 @@
 WiFiMulti WiFiMulti;
 WiFiServer server(80);
 WiFiUDP udp;
-HardwareSerial testing(2);
+HardwareSerial testing(2); //Second Serial object for ESP32 
 
-const char * udpAddress = "192.168.43.255";
-const int udpPort = 44444;
+const char * udpAddress = "192.168.43.255";  // This should be broadcast address of network.
+const int udpPort = 44444; // Port to listen on
 
 void setup()
 {
@@ -44,22 +44,27 @@ void setup()
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
-
+// Begining every object
   server.begin();
   delay(500);
   udp.begin(udpPort);
-  //////Jason Setup
+  
 }
 
 int flag1 = 0; char zx; int flag2 = 0;
 
 void loop() {
+  
   WiFiClient client = server.available();   // listen for incoming clients
-   uint8_t buffer[50] = "hello Pi, ESP here!"; //send hello to server
+  
+  // UDP for giving out ESP IP to RPI.
+    uint8_t buffer[50] = "hello Pi, ESP here!"; //send hello to server
     udp.beginPacket(udpAddress, udpPort);
     udp.write(buffer, 19);
     udp.endPacket();
     memset(buffer, 0, 50);  
+
+  // Client interaction
   if (client) {                             // if you get a client,
     Serial.println("New Client.");
     int value = 0;
@@ -72,8 +77,7 @@ void loop() {
 
     while (client.connected()) {           // loop while the client's connected
 
-      if (client.available() && flag == 0) {           // if there's bytes to read from the client,
-//        client.print("ESP32");
+      if (client.available() && flag == 0) {          // Verifying connection with PI(by sending Q,P)
         char d = client.read();
         if (d == 'Q') {
           client.write('P');
@@ -83,11 +87,9 @@ void loop() {
       }
 
       while (!client.available());
-      //      Serial.println("Chala");
-      if (client.available() && flag1 == 1) {
+
+       if (client.available() && flag1 == 1) {      // Checking whether its File or not
         char f = client.read();
-//        Serial.println(f);
-        //    Serial.println("wtf1");
         if (f == 'F') {
           flag = 1;
         }
@@ -97,16 +99,16 @@ void loop() {
       }
 
       while (!client.available());
-//      Serial.println("Chala");
-      if (client.available() && flag == 1) {
+
+      if (client.available() && flag == 1) {        //Code for file execution
         int i = 0;
-//        Serial.println("HAAN!");
         while (1) {
           char c = client.read();
           dson = dson + c;
           if (c == '}') {
-            Serial.println(dson);
+//            Serial.println(dson);
 
+//      Unpacking JSON format
             DynamicJsonBuffer jsonBuffer;
             JsonObject& root = jsonBuffer.parseObject(dson);
             if (!root.success()) {
@@ -117,18 +119,18 @@ void loop() {
             int hash_value = root["Hash_value"];
             int hash_try = hashing(Gcode);
 
-            if (index == i && hash_try == hash_value) {
+            if (index == i && hash_try == hash_value) {     // If lines are not missing then excute this
               //      Serial.print(index);
               //      Serial.print("\t");
                     Serial.println(Gcode);
               //      Serial.print("\t");
               //      Serial.println(hash_value);
 
-              testing.println(Gcode);
+              testing.println(Gcode);       //Sending Gcode to GRBL
               delay(10);
-              CNCResponse();
+              CNCResponse();                // Response from CNC
               dson = "";
-              client.print('Y');
+              client.print('Y');            // Responding to PI that process is done
               i++;
             }
             else {
@@ -146,7 +148,7 @@ void loop() {
       }
 
 
-      else if (client.available() && flag == 2)
+      else if (client.available() && flag == 2)  // Execute this if Gcode is Line not File
       {
         while (1)
         {
@@ -183,7 +185,7 @@ void loop() {
   delay(10);
 }
 
-
+// function for getting hashing value(encryption)
 int hashing(String val)
 { int hash = 0, i = 0;
   while (val[i] != '\0') {
@@ -193,6 +195,7 @@ int hashing(String val)
   return hash;
 }
 
+//Converting JSON line into GCOde
 String ConvJsonLine(String json)
 {
   DynamicJsonBuffer jsonBuffer;
@@ -204,7 +207,7 @@ String ConvJsonLine(String json)
   return Gcode;
 }
 
-
+// Sending Question mark after some time and checks CNC state
 void CNCResponse()
   { while (testing.available())
     {
@@ -231,7 +234,7 @@ void CNCResponse()
       Serial.println(response);
       response = response.substring(0, 10);
       if (response.indexOf("Idle") != -1)
-      {
+      {.
         break;
       }
       else if (response.indexOf("Run") != -1)
@@ -239,6 +242,8 @@ void CNCResponse()
     }
 
   }
+
+//function asking enocder value from STM 32 on request.
 
 void EncoderValue()
 {
